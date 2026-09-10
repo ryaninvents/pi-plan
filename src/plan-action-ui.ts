@@ -1,5 +1,5 @@
-import type { ExtensionUIContext } from "@mariozechner/pi-coding-agent";
-import { Editor, type EditorTheme, Key, matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
+import { Editor, type EditorTheme, Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
 export type PlanNextAction = "approve" | "continue" | "regenerate" | "exit";
 
