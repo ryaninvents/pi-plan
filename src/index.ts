@@ -1,5 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { selectPlanNextActionWithInlineNote } from "./plan-action-ui";
+import { createPlanHandoff } from "./plan-handoff";
 import {
 	extractTodoItems,
 	isSafeReadOnlyCommand,
@@ -68,6 +69,14 @@ const YOLO_MODE_SYSTEM_PROMPT = `
 
 const EXECUTION_TRIGGER_PROMPT =
 	"Plan approved. Switch to implementation mode and execute the latest plan now.";
+
+/**
+ * newSession() is only available on the command context, so the menu re-enters
+ * the extension through its own /plan command rather than registering a second
+ * user-facing command for an action that is only reachable from the menu.
+ */
+const HANDOFF_ARG = "--handoff";
+const HANDOFF_COMMAND = `/plan ${HANDOFF_ARG}`;
 
 function notify(
 	pi: ExtensionAPI,
@@ -244,6 +253,18 @@ export default function planExtension(pi: ExtensionAPI): void {
 		}
 	};
 
+	const { runPlanHandoff, applyPendingModel } = createPlanHandoff({
+		pi,
+		notify: (ctx, message, type) => notify(pi, ctx, message, type),
+		leavePlanMode: (ctx) => {
+			exitPlanMode(ctx, undefined, { resetProgress: true });
+			if (ctx.hasUI) {
+				ctx.ui.setStatus(STATUS_KEY, undefined);
+				ctx.ui.setWidget(TODO_WIDGET_KEY, undefined);
+			}
+		},
+	});
+
 	pi.registerCommand("plan", {
 		description:
 			"Enable read-only planning mode. Usage: /plan, /plan on, /plan off, /plan status, /plan <task>",
@@ -271,6 +292,15 @@ export default function planExtension(pi: ExtensionAPI): void {
 				exitPlanMode(ctx, "Plan mode disabled. Back to YOLO mode.", {
 					resetProgress: true,
 				});
+				return;
+			}
+
+			if (command === HANDOFF_ARG) {
+				if (!planModeEnabled) {
+					notify(pi, ctx, "Plan mode is not enabled.", "warning");
+					return;
+				}
+				await runPlanHandoff(ctx);
 				return;
 			}
 
@@ -428,6 +458,14 @@ export default function planExtension(pi: ExtensionAPI): void {
 			return;
 		}
 
+		if (selection.action === "handoff") {
+			// Deferred so the agent loop unwinds before the command handler runs.
+			setTimeout(() => {
+				pi.sendUserMessage(HANDOFF_COMMAND, { expandPromptTemplates: true });
+			}, 0);
+			return;
+		}
+
 		if (selection.action === "regenerate") {
 			todoItems = [];
 			setStatus(ctx);
@@ -469,7 +507,10 @@ export default function planExtension(pi: ExtensionAPI): void {
 		}
 	});
 
-	pi.on("session_start", async (_event, ctx) => {
+	pi.on("session_start", async (event, ctx) => {
+		if (event.reason === "new") {
+			await applyPendingModel(ctx);
+		}
 		setStatus(ctx);
 	});
 

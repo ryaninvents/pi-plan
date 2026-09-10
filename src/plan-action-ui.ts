@@ -1,7 +1,7 @@
 import type { ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { Editor, type EditorTheme, Key, matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
-export type PlanNextAction = "approve" | "continue" | "regenerate" | "exit";
+export type PlanNextAction = "approve" | "handoff" | "continue" | "regenerate" | "exit";
 
 export interface PlanNextActionResult {
 	cancelled: boolean;
@@ -11,6 +11,7 @@ export interface PlanNextActionResult {
 
 const ACTION_OPTIONS: ReadonlyArray<{ label: string; value: PlanNextAction }> = [
 	{ label: "Approve and execute now", value: "approve" },
+	{ label: "Switch model, clear history, and execute", value: "handoff" },
 	{ label: "Continue from proposed plan", value: "continue" },
 	{ label: "Regenerate plan", value: "regenerate" },
 	{ label: "Exit plan mode", value: "exit" },
